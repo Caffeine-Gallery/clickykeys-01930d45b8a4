@@ -28,6 +28,30 @@ body {
     color: #ffffff;
 }
 
+.game-settings {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#game-mode, #game-length, #start-game {
+    padding: 5px 10px;
+    font-size: 16px;
+    border-radius: 4px;
+    border: 1px solid #3a3a3a;
+    background: #1a1a1a;
+    color: #ffffff;
+}
+
+#start-game {
+    cursor: pointer;
+    background: #3a3a3a;
+}
+
+#start-game:hover {
+    background: #4a4a4a;
+}
+
 #target-text {
     font-size: 24px;
     margin-bottom: 10px;

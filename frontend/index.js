@@ -10,12 +10,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const wordCountElement = document.getElementById('word-count');
     const accuracyElement = document.getElementById('accuracy');
     const timerElement = document.getElementById('timer');
+    const gameModeSelect = document.getElementById('game-mode');
+    const gameLengthInput = document.getElementById('game-length');
+    const startGameButton = document.getElementById('start-game');
+
     let isCapsLock = false;
     let isShiftPressed = false;
     let currentScore = 0;
     let currentTargetText = '';
     let startTime;
     let timerInterval;
+    let gameMode = 'words';
+    let gameLength = 20;
+    let isGameActive = false;
+    let wordsTyped = 0;
 
     // Create audio context and sounds
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -92,7 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateTargetText() {
         const words = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'lazy', 'dog'];
         const randomWords = [];
-        for (let i = 0; i < 5; i++) {
+        const wordCount = gameMode === 'words' ? gameLength : 100; // Use 100 words for time mode
+        for (let i = 0; i < wordCount; i++) {
             const randomIndex = Math.floor(Math.random() * words.length);
             randomWords.push(words[randomIndex]);
         }
@@ -117,6 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
         timerInterval = setInterval(() => {
             const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
             timerElement.textContent = `Time: ${elapsedTime}s`;
+            if (gameMode === 'time' && elapsedTime >= gameLength) {
+                endGame();
+            }
         }, 1000);
     }
 
@@ -137,27 +149,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function checkUserInput() {
+        if (!isGameActive) return;
+
         const userInput = userInputElement.value;
         const targetText = currentTargetText.slice(0, userInput.length);
-
-        if (!startTime) {
-            startTimer();
-        }
 
         const accuracy = calculateAccuracy(userInput, targetText);
         accuracyElement.textContent = `Accuracy: ${accuracy}%`;
 
         if (userInput === targetText) {
             if (userInput.length === currentTargetText.length) {
-                const elapsedTime = stopTimer();
-                resultElement.textContent = 'Correct! Well done!';
-                resultElement.style.color = 'green';
-                currentScore += 10;
-                scoreElement.textContent = `Score: ${currentScore}`;
-                backend.addScore(currentScore, elapsedTime);
-                generateTargetText();
-                userInputElement.value = '';
-                startTime = null;
+                endGame();
             } else {
                 resultElement.textContent = 'Correct so far...';
                 resultElement.style.color = 'green';
@@ -167,10 +169,48 @@ document.addEventListener('DOMContentLoaded', () => {
             resultElement.textContent = 'Incorrect. Try again!';
             resultElement.style.color = 'red';
         }
+
+        wordsTyped = userInput.split(' ').length;
+        if (gameMode === 'words' && wordsTyped >= gameLength) {
+            endGame();
+        }
     }
 
-    // Handle physical keyboard input
-    document.addEventListener('keydown', async (e) => {
+    function startGame() {
+        isGameActive = true;
+        userInputElement.value = '';
+        userInputElement.readOnly = false;
+        userInputElement.focus();
+        currentScore = 0;
+        scoreElement.textContent = `Score: ${currentScore}`;
+        wordsTyped = 0;
+        generateTargetText();
+        startTimer();
+        startGameButton.textContent = 'End Game';
+    }
+
+    function endGame() {
+        isGameActive = false;
+        const elapsedTime = stopTimer();
+        userInputElement.readOnly = true;
+        resultElement.textContent = 'Game Over!';
+        resultElement.style.color = 'blue';
+        currentScore = calculateScore(elapsedTime);
+        scoreElement.textContent = `Score: ${currentScore}`;
+        backend.addScore(currentScore, elapsedTime);
+        startGameButton.textContent = 'Start Game';
+    }
+
+    function calculateScore(elapsedTime) {
+        const accuracy = parseInt(accuracyElement.textContent.split(':')[1]);
+        const wordsPerMinute = (wordsTyped / elapsedTime) * 60;
+        return Math.floor(wordsPerMinute * (accuracy / 100));
+    }
+
+    // Global keydown event listener
+    document.addEventListener('keydown', (e) => {
+        if (!isGameActive) return;
+
         const keyToFind = keyMap.get(e.key) || keyMap.get(e.code) || e.key.toUpperCase();
         
         if (e.key === 'CapsLock') {
@@ -206,9 +246,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Handle mouse/touch input
+    // Handle mouse/touch input for virtual keyboard
     keys.forEach(key => {
         key.addEventListener('mousedown', () => {
+            if (!isGameActive) return;
             key.classList.add('active');
             createKeySound(200 + Math.random() * 100);
             const char = key.textContent === 'Space' ? ' ' : key.textContent;
@@ -229,7 +270,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Typing game initialization
-    generateTargetText();
-    userInputElement.addEventListener('input', checkUserInput);
+    // Game settings event listeners
+    gameModeSelect.addEventListener('change', (e) => {
+        gameMode = e.target.value;
+        gameLengthInput.placeholder = gameMode === 'words' ? 'Number of words' : 'Time in seconds';
+    });
+
+    gameLengthInput.addEventListener('change', (e) => {
+        gameLength = parseInt(e.target.value);
+    });
+
+    startGameButton.addEventListener('click', () => {
+        if (isGameActive) {
+            endGame();
+        } else {
+            startGame();
+        }
+    });
+
+    // Initialize game settings
+    gameMode = gameModeSelect.value;
+    gameLength = parseInt(gameLengthInput.value);
 });
