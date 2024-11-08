@@ -4,8 +4,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const keys = document.querySelectorAll('.key');
     const textOutput = document.querySelector('.text-output');
     const capsLockKey = document.getElementById('caps');
+    const targetTextElement = document.getElementById('target-text');
+    const userInputElement = document.getElementById('user-input');
+    const resultElement = document.getElementById('result');
+    const scoreElement = document.getElementById('score');
     let isCapsLock = false;
     let isShiftPressed = false;
+    let currentScore = 0;
+    let currentTargetText = '';
 
     // Create audio context and sounds
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -111,6 +117,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function generateTargetText() {
+        const words = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'lazy', 'dog'];
+        const randomWords = [];
+        for (let i = 0; i < 5; i++) {
+            const randomIndex = Math.floor(Math.random() * words.length);
+            randomWords.push(words[randomIndex]);
+        }
+        currentTargetText = randomWords.join(' ');
+        targetTextElement.textContent = currentTargetText;
+        highlightKeys(currentTargetText[0]);
+    }
+
+    function highlightKeys(char) {
+        keys.forEach(key => {
+            if (key.textContent.toLowerCase() === char.toLowerCase()) {
+                key.classList.add('highlight');
+            } else {
+                key.classList.remove('highlight');
+            }
+        });
+    }
+
+    function checkUserInput() {
+        const userInput = userInputElement.value;
+        const targetText = currentTargetText.slice(0, userInput.length);
+
+        if (userInput === targetText) {
+            if (userInput.length === currentTargetText.length) {
+                resultElement.textContent = 'Correct! Well done!';
+                resultElement.style.color = 'green';
+                currentScore += 10;
+                scoreElement.textContent = `Score: ${currentScore}`;
+                generateTargetText();
+                userInputElement.value = '';
+            } else {
+                resultElement.textContent = 'Correct so far...';
+                resultElement.style.color = 'green';
+                highlightKeys(currentTargetText[userInput.length]);
+            }
+        } else {
+            resultElement.textContent = 'Incorrect. Try again!';
+            resultElement.style.color = 'red';
+        }
+    }
+
     // Handle physical keyboard input
     document.addEventListener('keydown', async (e) => {
         const keyToFind = keyMap.get(e.key) || keyMap.get(e.code) || e.key.toUpperCase();
@@ -169,6 +220,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Typing game initialization
+    generateTargetText();
+    userInputElement.addEventListener('input', checkUserInput);
 
     // Load initial text from backend
     loadTextFromBackend();

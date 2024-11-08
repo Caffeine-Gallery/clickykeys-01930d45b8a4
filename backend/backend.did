@@ -1,4 +1,6 @@
 service : {
+  addScore: (nat) -> ();
+  getHighScores: () -> (vec nat) query;
   getText: () -> (text) query;
   setText: (text) -> ();
 }

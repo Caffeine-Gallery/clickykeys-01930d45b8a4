@@ -20,6 +20,40 @@ body {
     margin: 20px;
 }
 
+.typing-game {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    color: #ffffff;
+}
+
+#target-text {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+#user-input {
+    width: 100%;
+    padding: 10px;
+    font-size: 18px;
+    margin-bottom: 10px;
+    background: #1a1a1a;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+#result {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+#score {
+    font-size: 18px;
+    font-weight: bold;
+}
+
 .input-area {
     width: 100%;
     margin-bottom: 20px;
@@ -101,6 +135,11 @@ body {
     background: #4a4a4a;
     transform: translateY(2px);
     box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.key.highlight {
+    background: #4a4a4a;
+    box-shadow: 0 0 10px #ffffff;
 }
 
 .key.space {
