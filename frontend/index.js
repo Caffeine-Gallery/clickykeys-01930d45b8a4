@@ -10,8 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const wordCountElement = document.getElementById('word-count');
     const accuracyElement = document.getElementById('accuracy');
     const timerElement = document.getElementById('timer');
+    const progressElement = document.getElementById('progress');
     const gameModeSelect = document.getElementById('game-mode');
     const gameLengthInput = document.getElementById('game-length');
+    const difficultySelect = document.getElementById('difficulty');
     const startGameButton = document.getElementById('start-game');
 
     let isCapsLock = false;
@@ -22,10 +24,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let gameMode = 'words';
     let gameLength = 20;
+    let difficulty = 'easy';
     let isGameActive = false;
     let wordsTyped = 0;
+    let currentLevel = 1;
 
-    // Create audio context and sounds
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
     function createKeySound(frequency, type = 'sine') {
@@ -97,18 +100,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function generateTargetText() {
-        const words = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'lazy', 'dog'];
-        const randomWords = [];
-        const wordCount = gameMode === 'words' ? gameLength : 100; // Use 100 words for time mode
-        for (let i = 0; i < wordCount; i++) {
-            const randomIndex = Math.floor(Math.random() * words.length);
-            randomWords.push(words[randomIndex]);
+    async function generateTargetText() {
+        try {
+            currentTargetText = await backend.getRandomSentence(difficulty, currentLevel);
+            targetTextElement.textContent = currentTargetText;
+            highlightKeys(currentTargetText[0]);
+            wordCountElement.textContent = `Words: ${currentTargetText.split(' ').length}`;
+        } catch (error) {
+            console.error('Error generating target text:', error);
         }
-        currentTargetText = randomWords.join(' ');
-        targetTextElement.textContent = currentTargetText;
-        highlightKeys(currentTargetText[0]);
-        wordCountElement.textContent = `Words: ${randomWords.length}`;
     }
 
     function highlightKeys(char) {
@@ -159,7 +159,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (userInput === targetText) {
             if (userInput.length === currentTargetText.length) {
-                endGame();
+                currentScore += calculateScore(accuracy);
+                scoreElement.textContent = `Score: ${currentScore}`;
+                wordsTyped += currentTargetText.split(' ').length;
+                if (gameMode === 'words' && wordsTyped >= gameLength) {
+                    endGame();
+                } else {
+                    generateTargetText();
+                    userInputElement.value = '';
+                    updateLevel();
+                }
             } else {
                 resultElement.textContent = 'Correct so far...';
                 resultElement.style.color = 'green';
@@ -169,11 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
             resultElement.textContent = 'Incorrect. Try again!';
             resultElement.style.color = 'red';
         }
+    }
 
-        wordsTyped = userInput.split(' ').length;
-        if (gameMode === 'words' && wordsTyped >= gameLength) {
-            endGame();
-        }
+    function updateLevel() {
+        currentLevel = Math.floor(wordsTyped / 20) + 1;
+        progressElement.textContent = `Level: ${currentLevel}`;
+        difficulty = currentLevel <= 3 ? 'easy' : currentLevel <= 6 ? 'medium' : 'hard';
+        difficultySelect.value = difficulty;
     }
 
     function startGame() {
@@ -184,6 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentScore = 0;
         scoreElement.textContent = `Score: ${currentScore}`;
         wordsTyped = 0;
+        currentLevel = 1;
+        progressElement.textContent = `Level: ${currentLevel}`;
         generateTargetText();
         startTimer();
         startGameButton.textContent = 'End Game';
@@ -195,19 +208,15 @@ document.addEventListener('DOMContentLoaded', () => {
         userInputElement.readOnly = true;
         resultElement.textContent = 'Game Over!';
         resultElement.style.color = 'blue';
-        currentScore = calculateScore(elapsedTime);
-        scoreElement.textContent = `Score: ${currentScore}`;
         backend.addScore(currentScore, elapsedTime);
         startGameButton.textContent = 'Start Game';
     }
 
-    function calculateScore(elapsedTime) {
-        const accuracy = parseInt(accuracyElement.textContent.split(':')[1]);
-        const wordsPerMinute = (wordsTyped / elapsedTime) * 60;
-        return Math.floor(wordsPerMinute * (accuracy / 100));
+    function calculateScore(accuracy) {
+        const difficultyMultiplier = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 1.5 : 2;
+        return Math.floor(10 * accuracy * difficultyMultiplier);
     }
 
-    // Global keydown event listener
     document.addEventListener('keydown', (e) => {
         if (!isGameActive) return;
 
@@ -246,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Handle mouse/touch input for virtual keyboard
     keys.forEach(key => {
         key.addEventListener('mousedown', () => {
             if (!isGameActive) return;
@@ -270,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Game settings event listeners
     gameModeSelect.addEventListener('change', (e) => {
         gameMode = e.target.value;
         gameLengthInput.placeholder = gameMode === 'words' ? 'Number of words' : 'Time in seconds';
@@ -278,6 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     gameLengthInput.addEventListener('change', (e) => {
         gameLength = parseInt(e.target.value);
+    });
+
+    difficultySelect.addEventListener('change', (e) => {
+        difficulty = e.target.value;
     });
 
     startGameButton.addEventListener('click', () => {
@@ -288,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Initialize game settings
     gameMode = gameModeSelect.value;
     gameLength = parseInt(gameLengthInput.value);
+    difficulty = difficultySelect.value;
 });

@@ -6,6 +6,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
         ['query'],
       ),
+    'getRandomSentence' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Text], []),
   });
 };
 export const init = ({ IDL }) => { return []; };
