@@ -2,16 +2,20 @@ import { backend } from 'declarations/backend';
 
 document.addEventListener('DOMContentLoaded', () => {
     const keys = document.querySelectorAll('.key');
-    const textOutput = document.querySelector('.text-output');
     const capsLockKey = document.getElementById('caps');
     const targetTextElement = document.getElementById('target-text');
     const userInputElement = document.getElementById('user-input');
     const resultElement = document.getElementById('result');
     const scoreElement = document.getElementById('score');
+    const wordCountElement = document.getElementById('word-count');
+    const accuracyElement = document.getElementById('accuracy');
+    const timerElement = document.getElementById('timer');
     let isCapsLock = false;
     let isShiftPressed = false;
     let currentScore = 0;
     let currentTargetText = '';
+    let startTime;
+    let timerInterval;
 
     // Create audio context and sounds
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -63,57 +67,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const action = shortcuts[key].action;
             switch(action) {
                 case 'selectAll':
-                    textOutput.select();
+                    userInputElement.select();
                     break;
                 case 'copy':
-                    navigator.clipboard.writeText(textOutput.value);
+                    navigator.clipboard.writeText(userInputElement.value);
                     break;
                 case 'paste':
                     navigator.clipboard.readText().then(text => {
-                        const cursorPos = textOutput.selectionStart;
-                        const textBefore = textOutput.value.substring(0, cursorPos);
-                        const textAfter = textOutput.value.substring(textOutput.selectionEnd);
-                        textOutput.value = textBefore + text + textAfter;
-                        updateBackendText();
+                        const cursorPos = userInputElement.selectionStart;
+                        const textBefore = userInputElement.value.substring(0, cursorPos);
+                        const textAfter = userInputElement.value.substring(userInputElement.selectionEnd);
+                        userInputElement.value = textBefore + text + textAfter;
+                        checkUserInput();
                     });
                     break;
                 case 'undo':
-                    textOutput.value = textOutput.value.slice(0, -1);
-                    updateBackendText();
+                    userInputElement.value = userInputElement.value.slice(0, -1);
+                    checkUserInput();
                     break;
             }
-        }
-    }
-
-    async function updateTextOutput(key) {
-        if (key === 'Delete') {
-            textOutput.value = textOutput.value.slice(0, -1);
-        } else if (key === 'Return') {
-            textOutput.value += '\n';
-        } else if (key === 'Space') {
-            textOutput.value += ' ';
-        } else if (key.length === 1) {
-            const char = isShiftPressed || isCapsLock ? key : key.toLowerCase();
-            textOutput.value += char;
-        }
-        textOutput.scrollTop = textOutput.scrollHeight;
-        await updateBackendText();
-    }
-
-    async function updateBackendText() {
-        try {
-            await backend.setText(textOutput.value);
-        } catch (error) {
-            console.error('Error updating backend text:', error);
-        }
-    }
-
-    async function loadTextFromBackend() {
-        try {
-            const text = await backend.getText();
-            textOutput.value = text;
-        } catch (error) {
-            console.error('Error loading text from backend:', error);
         }
     }
 
@@ -127,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTargetText = randomWords.join(' ');
         targetTextElement.textContent = currentTargetText;
         highlightKeys(currentTargetText[0]);
+        wordCountElement.textContent = `Words: ${randomWords.length}`;
     }
 
     function highlightKeys(char) {
@@ -139,18 +112,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function startTimer() {
+        startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            timerElement.textContent = `Time: ${elapsedTime}s`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+        return elapsedTime;
+    }
+
+    function calculateAccuracy(userInput, targetText) {
+        let correctChars = 0;
+        for (let i = 0; i < userInput.length; i++) {
+            if (userInput[i] === targetText[i]) {
+                correctChars++;
+            }
+        }
+        return Math.floor((correctChars / targetText.length) * 100);
+    }
+
     function checkUserInput() {
         const userInput = userInputElement.value;
         const targetText = currentTargetText.slice(0, userInput.length);
 
+        if (!startTime) {
+            startTimer();
+        }
+
+        const accuracy = calculateAccuracy(userInput, targetText);
+        accuracyElement.textContent = `Accuracy: ${accuracy}%`;
+
         if (userInput === targetText) {
             if (userInput.length === currentTargetText.length) {
+                const elapsedTime = stopTimer();
                 resultElement.textContent = 'Correct! Well done!';
                 resultElement.style.color = 'green';
                 currentScore += 10;
                 scoreElement.textContent = `Score: ${currentScore}`;
+                backend.addScore(currentScore, elapsedTime);
                 generateTargetText();
                 userInputElement.value = '';
+                startTime = null;
             } else {
                 resultElement.textContent = 'Correct so far...';
                 resultElement.style.color = 'green';
@@ -181,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (key.textContent === keyToFind) {
                 key.classList.add('active');
                 createKeySound(200 + Math.random() * 100);
-                updateTextOutput(key.textContent);
             }
         });
     });
@@ -205,7 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
         key.addEventListener('mousedown', () => {
             key.classList.add('active');
             createKeySound(200 + Math.random() * 100);
-            updateTextOutput(key.textContent);
+            const char = key.textContent === 'Space' ? ' ' : key.textContent;
+            userInputElement.value += char;
+            checkUserInput();
         });
 
         key.addEventListener('mouseup', () => {
@@ -224,7 +232,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Typing game initialization
     generateTargetText();
     userInputElement.addEventListener('input', checkUserInput);
-
-    // Load initial text from backend
-    loadTextFromBackend();
 });
